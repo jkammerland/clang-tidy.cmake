@@ -28,6 +28,10 @@ file(GLOB TIDY_TESTS CONFIGURE_DEPENDS "*.cpp")
 add_executable(tests ${TIDY_TESTS})
 register_project_sources(tests)
 
+# Other targets...
+# register_project_sources(...)
+# ...
+
 # --- Finalize and Create Tidy Targets ---
 # This call MUST be at the end, after all targets and add_subdirectory calls.
 finalize_clang_tidy_targets()
@@ -43,22 +47,18 @@ finalize_clang_tidy_targets()
     # Can be generated with:
     # cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     ```
-    *   To run on a specific file:
-        `cmake .. -DCLANG_TIDY_FILE="src/main.cpp"`
-    *   To change target names (less common):
-        `cmake .. -DCLANG_TIDY_TARGET_NAME="lint" -DCLANG_TIDY_FIX_TARGET_NAME="lint-fix"`
     *   Single-threaded option (default is automatic multi-threaded):
         `cmake .. -DTIDY_SINGLE_THREADED=ON`
 
 2.  **Run Tidy Targets:**
     *   **Check for issues (read-only):**
         ```bash
-        cmake --build . --target tidy # Or your custom CLANG_TIDY_TARGET_NAME
+        cmake --build . --target tidy
         # or: make tidy / ninja tidy
         ```
     *   **Apply fixes:**
         ```bash
-        cmake --build . --target tidy-fix # Or your custom CLANG_TIDY_FIX_TARGET_NAME
+        cmake --build . --target tidy-fix
         # or: make tidy-fix / ninja tidy-fix
         ```
 
