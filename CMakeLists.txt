@@ -16,14 +16,6 @@ endif()
 # --- Will control multi-threading of clang-tidy too ---
 option(TIDY_USES_TERMINAL "Serializes output with colors, also makes it single threaded" OFF)
 option(TIDY_SINGLE_THREADED "Single threaded clang-tidy" OFF)
-set(USES_TERMINAL_STRING
-    "${TIDY_USES_TERMINAL}"
-    CACHE STRING "Derived from TIDY_USES_TERMINAL" FORCE)
-if(TIDY_USES_TERMINAL OR TIDY_SINGLE_THREADED)
-  set(USES_TERMINAL_STRING "USES_TERMINAL")
-else()
-  set(USES_TERMINAL_STRING "")
-endif()
 
 function(register_project_sources TARGET_NAME)
   # Check if the global list variables are defined, error out if not (as a safeguard)
@@ -169,30 +161,55 @@ function(finalize_clang_tidy_targets)
         set(FIX_STAMP_FILE "${STAMP_DIR}/${SAFE_TU_IDENTIFIER}.fixed")
 
         # Custom command for checking a single TU
-        add_custom_command(
-          OUTPUT ${CHECK_STAMP_FILE}
-          COMMAND ${CMAKE_COMMAND} -E echo "Tidying (check): ${TU_FILE}" # Optional: print which file is being processed
-          COMMAND ${CLANG_TIDY_EXE} ${TIDY_CHECK_ARGS} "${TU_FILE}"
-          COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
-          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
-          DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
-          # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target, depending on that target
-          # might also be an option.
-          COMMENT "Running clang-tidy (check) on ${TU_FILE}"
-          VERBATIM ${USES_TERMINAL_STRING} # Ensures colored output is displayed correctly by Ninja
-        )
+        if(TIDY_USES_TERMINAL OR TIDY_SINGLE_THREADED)
+          add_custom_command(
+            OUTPUT ${CHECK_STAMP_FILE}
+            COMMAND ${CMAKE_COMMAND} -E echo "Tidying (check): ${TU_FILE}" # Optional: print which file is being processed
+            COMMAND ${CLANG_TIDY_EXE} ${TIDY_CHECK_ARGS} "${TU_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
+            DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
+            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target, depending on that
+            # target might also be an option.
+            COMMENT "Running clang-tidy (check) on ${TU_FILE}"
+            VERBATIM USES_TERMINAL)
+        else()
+          add_custom_command(
+            OUTPUT ${CHECK_STAMP_FILE}
+            COMMAND ${CMAKE_COMMAND} -E echo "Tidying (check): ${TU_FILE}" # Optional: print which file is being processed
+            COMMAND ${CLANG_TIDY_EXE} ${TIDY_CHECK_ARGS} "${TU_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
+            DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
+            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target, depending on that
+            # target might also be an option.
+            COMMENT "Running clang-tidy (check) on ${TU_FILE}"
+            VERBATIM)
+        endif()
         list(APPEND TIDY_STAMP_FILES ${CHECK_STAMP_FILE})
 
         # Custom command for fixing a single TU
-        add_custom_command(
-          OUTPUT ${FIX_STAMP_FILE}
-          COMMAND ${CMAKE_COMMAND} -E echo "Tidying (fix): ${TU_FILE}"
-          COMMAND ${CLANG_TIDY_EXE} ${TIDY_FIX_ARGS} "${TU_FILE}"
-          COMMAND ${CMAKE_COMMAND} -E touch ${FIX_STAMP_FILE}
-          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-          DEPENDS ${COMPILE_COMMANDS_JSON}
-          COMMENT "Running clang-tidy (apply-fixes) on ${TU_FILE}"
-          VERBATIM ${USES_TERMINAL_STRING})
+        if(TIDY_USES_TERMINAL OR TIDY_SINGLE_THREADED)
+          add_custom_command(
+            OUTPUT ${FIX_STAMP_FILE}
+            COMMAND ${CMAKE_COMMAND} -E echo "Tidying (fix): ${TU_FILE}"
+            COMMAND ${CLANG_TIDY_EXE} ${TIDY_FIX_ARGS} "${TU_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E touch ${FIX_STAMP_FILE}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            DEPENDS ${COMPILE_COMMANDS_JSON}
+            COMMENT "Running clang-tidy (apply-fixes) on ${TU_FILE}"
+            VERBATIM USES_TERMINAL)
+        else()
+          add_custom_command(
+            OUTPUT ${FIX_STAMP_FILE}
+            COMMAND ${CMAKE_COMMAND} -E echo "Tidying (fix): ${TU_FILE}"
+            COMMAND ${CLANG_TIDY_EXE} ${TIDY_FIX_ARGS} "${TU_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E touch ${FIX_STAMP_FILE}
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            DEPENDS ${COMPILE_COMMANDS_JSON}
+            COMMENT "Running clang-tidy (apply-fixes) on ${TU_FILE}"
+            VERBATIM)
+        endif()
         list(APPEND TIDY_FIX_STAMP_FILES ${FIX_STAMP_FILE})
       endforeach()
 
