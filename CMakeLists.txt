@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(clang-tidy.cmake VERSION 1.0.3)
+project(clang-tidy.cmake VERSION 1.0.4)
 
 if(NOT COMMAND list_file_include_guard)
   find_package(target_install_package)
@@ -13,6 +13,16 @@ if(NOT COMMAND list_file_include_guard)
 endif()
 
 project_include_guard()
+
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.clang-tidy)
+  if(COMMAND project_log)
+    project_log(VERBOSE "No .clang-tidy file found in project root, you can use this for reference:")
+    project_log(VERBOSE "--> ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy")
+  else()
+    message(VERBOSE "No .clang-tidy file found in project root, you can use this for reference:")
+    message(VERBOSE "--> ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy")
+  endif()
+endif()
 
 # --- Global CACHE variables for collected sources ---
 set(PROJECT_TRANSLATION_UNITS_FOR_TIDY
@@ -269,8 +279,8 @@ function(finalize_clang_tidy_targets)
   endif()
 endfunction()
 
-option(clang-tidy.cmake_BUILD_TESTS "Build tests for clang-tidy" OFF)
-if(clang-tidy.cmake_BUILD_TESTS)
+option(${PROJECT_NAME}_BUILD_TESTS "Build tests for clang-tidy" OFF)
+if(${PROJECT_NAME}_BUILD_TESTS)
   include(CTest)
   enable_testing()
   add_subdirectory(tests)
@@ -280,8 +290,33 @@ if(clang-tidy.cmake_BUILD_TESTS)
   finalize_clang_tidy_targets()
 endif()
 
-if(target_install_package_FOUND)
-  add_library(clang-tidy INTERFACE)
+set(CLANG_TIDY_CMAKE_INSTALL
+    "OFF"
+    CACHE BOOL "Install clang-tidy.cmake")
+if(CLANG_TIDY_CMAKE_INSTALL)
+  if(NOT target_install_package_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+      target_install_package
+      GIT_REPOSITORY https://github.com/jkammerland/target_install_package.cmake.git
+      GIT_TAG v5.3.1)
+    FetchContent_MakeAvailable(target_install_package)
+  endif()
 
-  target_install_package(clang-tidy)
+  add_library(${PROJECT_NAME} INTERFACE)
+
+  target_install_package(
+    ${PROJECT_NAME}
+    ADDITIONAL_FILES
+    ${CMAKE_CURRENT_LIST_DIR}/list_file_include_guard.cmake
+    ${CMAKE_CURRENT_LIST_DIR}/project_include_guard.cmake
+    ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy
+    ADDITIONAL_FILES_DESTINATION
+    ${CMAKE_INSTALL_DATADIR}/cmake/${PROJECT_NAME}
+    PUBLIC_CMAKE_FILES
+    ${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt
+    RUNTIME_COMPONENT
+    "ClangTidy"
+    DEVELOPMENT_COMPONENT
+    "ClangTidy")
 endif()

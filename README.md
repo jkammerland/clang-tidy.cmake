@@ -1,7 +1,5 @@
 # Clang-Tidy-Cmake
 
-## pre-requisites
-
 ### Using FetchContent
 ```cmake
 # CMakeLists.txt
@@ -10,7 +8,7 @@ include(FetchContent)
 FetchContent_Declare(
   ClangTidyCmake
   GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
-  GIT_TAG        1.0.3
+  GIT_TAG        1.0.4
 )
 
 FetchContent_MakeAvailable(ClangTidyCmake)
@@ -18,7 +16,21 @@ FetchContent_MakeAvailable(ClangTidyCmake)
 
 ### Using cpmaddpackage (FetchContent wrapper)
 ```cmake
-cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.0.3")
+cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.0.4")
+```
+
+### Manual install
+
+```cmake
+mkdir build && cd build
+cmake .. -DCLANG_TIDY_CMAKE_INSTALL=ON # OR -DCMAKE_INSTALL_PREFIX=/path/to/install
+cmake --install .
+```
+
+Then in the consumer project:
+
+```cmake
+find_package(clang-tidy.cmake CONFIG REQUIRED)
 ```
 
 ## Usage Example
