@@ -1,6 +1,19 @@
 cmake_minimum_required(VERSION 3.25)
 project(clang-tidy.cmake VERSION 1.0.3)
 
+if(NOT COMMAND list_file_include_guard)
+  find_package(target_install_package)
+
+  if(NOT target_install_package_FOUND)
+    include(list_file_include_guard.cmake)
+    include(project_include_guard.cmake)
+  else()
+    project_log(VERBOSE "target_install_package found, using project_include_guard from target_install_package")
+  endif()
+endif()
+
+project_include_guard()
+
 # --- Global CACHE variables for collected sources ---
 set(PROJECT_TRANSLATION_UNITS_FOR_TIDY
     ""
@@ -17,15 +30,15 @@ endif()
 option(TIDY_USES_TERMINAL "Serializes output with colors, also makes it single threaded" OFF)
 option(TIDY_SINGLE_THREADED "Single threaded clang-tidy" OFF)
 
-# New definition, an alias
+# Alias for the old function, for backwards compatibility
 function(target_tidy_sources TARGET_NAME)
-  register_project_sources(${TARGET_NAME})
+  target_tidy_sources(${TARGET_NAME})
 endfunction(target_tidy_sources)
 
 function(register_project_sources TARGET_NAME)
   # Check if the global list variables are defined, error out if not (as a safeguard)
   if(NOT DEFINED CACHE{PROJECT_TRANSLATION_UNITS_FOR_TIDY} OR NOT DEFINED CACHE{PROJECT_HEADERS_FOR_TIDY}) # Check cache existence
-    message(FATAL_ERROR "CACHE variables PROJECT_TRANSLATION_UNITS_FOR_TIDY and PROJECT_HEADERS_FOR_TIDY must be initialized before calling register_project_sources.")
+    message(FATAL_ERROR "CACHE variables PROJECT_TRANSLATION_UNITS_FOR_TIDY and PROJECT_HEADERS_FOR_TIDY must be initialized before calling target_tidy_sources.")
     return()
   endif()
 
@@ -265,4 +278,10 @@ if(clang-tidy.cmake_BUILD_TESTS)
   # --- Finalize and Create Tidy Targets ---
   # This call MUST be at the end, after all targets and add_subdirectory calls.
   finalize_clang_tidy_targets()
+endif()
+
+if(target_install_package_FOUND)
+  add_library(clang-tidy INTERFACE)
+
+  target_install_package(clang-tidy)
 endif()

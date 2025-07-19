@@ -26,10 +26,10 @@ cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.0.3")
 ```cmake
 file(GLOB TIDY_TESTS CONFIGURE_DEPENDS "*.cpp")
 add_executable(tests ${TIDY_TESTS})
-register_project_sources(tests)
+target_tidy_sources(tests)
 
 # Other targets...
-# register_project_sources(...)
+# target_tidy_sources(...)
 # ...
 
 # --- Finalize and Create Tidy Targets ---
