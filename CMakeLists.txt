@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(clang-tidy.cmake CXX)
+project(clang-tidy.cmake VERSION 1.0.3)
 
 # --- Global CACHE variables for collected sources ---
 set(PROJECT_TRANSLATION_UNITS_FOR_TIDY
@@ -91,6 +91,12 @@ function(finalize_clang_tidy_targets)
   set(CLANG_TIDY_FIX_TARGET_NAME
       "${CLANG_TIDY_TARGET_NAME}-fix"
       CACHE STRING "Name for the clang-tidy apply-fixes target")
+  set(CLANG_TIDY_HEADER_FILTER
+      ""
+      CACHE STRING "Regex for filtering which headers to check (overrides HeaderFilterRegex in .clang-tidy if set)")
+  set(CLANG_TIDY_HEADER_EXCLUDE
+      ""
+      CACHE STRING "Regex for excluding headers from checking (optional, overrides ExcludeHeaderFilterRegex in .clang-tidy if set)")
 
   if(ENABLE_CLANG_TIDY)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # Crucial for clang-tidy
@@ -106,10 +112,23 @@ function(finalize_clang_tidy_targets)
     list(APPEND TIDY_COMMON_ARGS "-p=${CMAKE_BINARY_DIR}")
     # Add color output for supported platforms
     list(APPEND TIDY_COMMON_ARGS "$<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Darwin>,$<PLATFORM_ID:FreeBSD>>:--use-color>")
-    # Can add more common args here, e.g., --quiet, --header-filter=...
+    # Add header filter if specified (overrides HeaderFilterRegex in .clang-tidy)
+    if(CLANG_TIDY_HEADER_FILTER AND NOT CLANG_TIDY_HEADER_FILTER STREQUAL "")
+      list(APPEND TIDY_COMMON_ARGS "--header-filter=${CLANG_TIDY_HEADER_FILTER}")
+    endif()
+    # Add header exclude filter if specified (overrides ExcludeHeaderFilterRegex in .clang-tidy)
+    if(CLANG_TIDY_HEADER_EXCLUDE AND NOT CLANG_TIDY_HEADER_EXCLUDE STREQUAL "")
+      list(APPEND TIDY_COMMON_ARGS "--exclude-header-filter=${CLANG_TIDY_HEADER_EXCLUDE}")
+    endif()
 
     if(EXISTS "${CMAKE_SOURCE_DIR}/.clang-tidy")
       message(STATUS "Using .clang-tidy configuration file from project root: ${CMAKE_SOURCE_DIR}/.clang-tidy")
+      if(CLANG_TIDY_HEADER_FILTER AND NOT CLANG_TIDY_HEADER_FILTER STREQUAL "")
+        message(STATUS "  NOTE: CLANG_TIDY_HEADER_FILTER='${CLANG_TIDY_HEADER_FILTER}' overrides HeaderFilterRegex in .clang-tidy")
+      endif()
+      if(CLANG_TIDY_HEADER_EXCLUDE AND NOT CLANG_TIDY_HEADER_EXCLUDE STREQUAL "")
+        message(STATUS "  NOTE: CLANG_TIDY_HEADER_EXCLUDE='${CLANG_TIDY_HEADER_EXCLUDE}' overrides ExcludeHeaderFilterRegex in .clang-tidy")
+      endif()
     else()
       message(WARNING "No .clang-tidy file found in project root (${CMAKE_SOURCE_DIR}/.clang-tidy). Clang-tidy will use its default checks. It is highly recommended to create a .clang-tidy file.")
     endif()
@@ -169,8 +188,8 @@ function(finalize_clang_tidy_targets)
             COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
             DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
-            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target, depending on that
-            # target might also be an option.
+            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target,
+            # depending on that target might also be an option.
             COMMENT "Running clang-tidy (check) on ${TU_FILE}"
             VERBATIM USES_TERMINAL)
         else()
@@ -181,8 +200,8 @@ function(finalize_clang_tidy_targets)
             COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
             DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
-            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target, depending on that
-            # target might also be an option.
+            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target,
+            # depending on that target might also be an option.
             COMMENT "Running clang-tidy (check) on ${TU_FILE}"
             VERBATIM)
         endif()

@@ -10,7 +10,7 @@ include(FetchContent)
 FetchContent_Declare(
   ClangTidyCmake
   GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
-  GIT_TAG        1.0.1
+  GIT_TAG        1.0.3
 )
 
 FetchContent_MakeAvailable(ClangTidyCmake)
@@ -18,7 +18,7 @@ FetchContent_MakeAvailable(ClangTidyCmake)
 
 ### Using cpmaddpackage (FetchContent wrapper)
 ```cmake
-cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.0.1")
+cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.0.3")
 ```
 
 ## Usage Example
