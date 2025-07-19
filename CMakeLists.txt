@@ -17,6 +17,11 @@ endif()
 option(TIDY_USES_TERMINAL "Serializes output with colors, also makes it single threaded" OFF)
 option(TIDY_SINGLE_THREADED "Single threaded clang-tidy" OFF)
 
+# New definition, an alias
+function(target_tidy_sources TARGET_NAME)
+  register_project_sources(${TARGET_NAME})
+endfunction(target_tidy_sources)
+
 function(register_project_sources TARGET_NAME)
   # Check if the global list variables are defined, error out if not (as a safeguard)
   if(NOT DEFINED CACHE{PROJECT_TRANSLATION_UNITS_FOR_TIDY} OR NOT DEFINED CACHE{PROJECT_HEADERS_FOR_TIDY}) # Check cache existence
