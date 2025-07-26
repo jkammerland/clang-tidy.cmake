@@ -42,7 +42,7 @@ option(TIDY_SINGLE_THREADED "Single threaded clang-tidy" OFF)
 
 # Alias for the old function, for backwards compatibility
 function(target_tidy_sources TARGET_NAME)
-  target_tidy_sources(${TARGET_NAME})
+  register_project_sources(${TARGET_NAME})
 endfunction(target_tidy_sources)
 
 function(register_project_sources TARGET_NAME)
