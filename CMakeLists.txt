@@ -80,7 +80,7 @@ function(register_project_sources TARGET_NAME)
         list(APPEND LOCAL_HEADERS_FOR_TARGET "${ABS_FILE_PATH}")
       endif()
     else()
-      # message(WARNING "Tidy: File from target ${TARGET_NAME} not found: ${ABS_FILE_PATH} (original: ${FILE_PATH_RELATIVE} in ${TARGET_SOURCE_DIR})")
+      message(WARNING "Tidy: File from target ${TARGET_NAME} not found: ${ABS_FILE_PATH} (original: ${FILE_PATH_RELATIVE} in ${TARGET_SOURCE_DIR})")
     endif()
   endforeach()
 
@@ -138,8 +138,11 @@ function(finalize_clang_tidy_targets)
     set(TIDY_COMMON_ARGS "")
     # The -p argument tells clang-tidy where to find compile_commands.json
     list(APPEND TIDY_COMMON_ARGS "-p=${CMAKE_BINARY_DIR}")
-    # Add color output for supported platforms
-    list(APPEND TIDY_COMMON_ARGS "$<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Darwin>,$<PLATFORM_ID:FreeBSD>>:--use-color>")
+    # Add color output option
+    option(CLANG_TIDY_USE_COLOR "Enable colored output for clang-tidy" ON)
+    if(CLANG_TIDY_USE_COLOR)
+      list(APPEND TIDY_COMMON_ARGS "--use-color")
+    endif()
     # Add header filter if specified (overrides HeaderFilterRegex in .clang-tidy)
     if(CLANG_TIDY_HEADER_FILTER AND NOT CLANG_TIDY_HEADER_FILTER STREQUAL "")
       list(APPEND TIDY_COMMON_ARGS "--header-filter=${CLANG_TIDY_HEADER_FILTER}")
@@ -200,9 +203,13 @@ function(finalize_clang_tidy_targets)
 
       foreach(TU_FILE ${CURRENT_FILES_TO_PROCESS})
         # Create a unique but predictable name for the stamp file based on the TU path
-        string(REPLACE "/" "_" SAFE_TU_PATH_PART "${TU_FILE}") # Basic sanitization
-        string(REPLACE ":" "_" SAFE_TU_PATH_PART "${SAFE_TU_PATH_PART}") # For Windows paths
-        string(MAKE_C_IDENTIFIER "${SAFE_TU_PATH_PART}" SAFE_TU_IDENTIFIER) # More robust sanitization
+        # Use CMAKE_PATH for proper cross-platform path handling
+        cmake_path(GET TU_FILE FILENAME TU_FILENAME)
+        cmake_path(GET TU_FILE PARENT_PATH TU_PARENT)
+        cmake_path(HASH TU_PARENT TU_PARENT_HASH)
+        # Combine filename and parent hash for unique identifier
+        set(SAFE_TU_IDENTIFIER "${TU_FILENAME}_${TU_PARENT_HASH}")
+        string(MAKE_C_IDENTIFIER "${SAFE_TU_IDENTIFIER}" SAFE_TU_IDENTIFIER)
 
         set(CHECK_STAMP_FILE "${STAMP_DIR}/${SAFE_TU_IDENTIFIER}.checked")
         set(FIX_STAMP_FILE "${STAMP_DIR}/${SAFE_TU_IDENTIFIER}.fixed")
@@ -215,9 +222,7 @@ function(finalize_clang_tidy_targets)
             COMMAND ${CLANG_TIDY_EXE} ${TIDY_CHECK_ARGS} "${TU_FILE}"
             COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
-            DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
-            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target,
-            # depending on that target might also be an option.
+            DEPENDS ${COMPILE_COMMANDS_JSON} ${TU_FILE} ${TU_FILE} # Re-run if compile commands or source file change
             COMMENT "Running clang-tidy (check) on ${TU_FILE}"
             VERBATIM USES_TERMINAL)
         else()
@@ -227,9 +232,7 @@ function(finalize_clang_tidy_targets)
             COMMAND ${CLANG_TIDY_EXE} ${TIDY_CHECK_ARGS} "${TU_FILE}"
             COMMAND ${CMAKE_COMMAND} -E touch ${CHECK_STAMP_FILE} # Create stamp file on success
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} # Or CMAKE_BINARY_DIR if preferred, but ensure -p points correctly
-            DEPENDS ${COMPILE_COMMANDS_JSON} # Re-run if compile commands change
-            # For more fine-grained dependencies, you could try to depend on the TU_FILE itself, but compile_commands.json is usually sufficient for clang-tidy. If TU_FILE is a source of a target,
-            # depending on that target might also be an option.
+            DEPENDS ${COMPILE_COMMANDS_JSON} ${TU_FILE} ${TU_FILE} # Re-run if compile commands or source file change
             COMMENT "Running clang-tidy (check) on ${TU_FILE}"
             VERBATIM)
         endif()
@@ -243,7 +246,7 @@ function(finalize_clang_tidy_targets)
             COMMAND ${CLANG_TIDY_EXE} ${TIDY_FIX_ARGS} "${TU_FILE}"
             COMMAND ${CMAKE_COMMAND} -E touch ${FIX_STAMP_FILE}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            DEPENDS ${COMPILE_COMMANDS_JSON}
+            DEPENDS ${COMPILE_COMMANDS_JSON} ${TU_FILE}
             COMMENT "Running clang-tidy (apply-fixes) on ${TU_FILE}"
             VERBATIM USES_TERMINAL)
         else()
@@ -253,7 +256,7 @@ function(finalize_clang_tidy_targets)
             COMMAND ${CLANG_TIDY_EXE} ${TIDY_FIX_ARGS} "${TU_FILE}"
             COMMAND ${CMAKE_COMMAND} -E touch ${FIX_STAMP_FILE}
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            DEPENDS ${COMPILE_COMMANDS_JSON}
+            DEPENDS ${COMPILE_COMMANDS_JSON} ${TU_FILE}
             COMMENT "Running clang-tidy (apply-fixes) on ${TU_FILE}"
             VERBATIM)
         endif()

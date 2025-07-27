@@ -29,4 +29,4 @@ Checks: >-
   misc-*,
   -misc-non-private-member-variables-in-classes,
   -misc-use-internal-linkage
-HeaderFilterRegex: '.*/(src|include|tests)/.*'
+HeaderFilterRegex: '.*([\\/])(src|include|tests)([\\/]).*'
