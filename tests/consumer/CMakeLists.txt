@@ -8,6 +8,9 @@ find_package(clang-tidy.cmake REQUIRED)
 # Create a simple executable
 add_executable(example main.cpp)
 
+# Set C++11 standard for the example code
+set_target_properties(example PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+
 # Register sources for clang-tidy
 register_project_sources(example)
 

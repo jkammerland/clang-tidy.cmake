@@ -65,15 +65,17 @@ jobs:
     - name: Configure CMake
       shell: bash
       run: |
-        cmake -B build -G "${{ matrix.cmake_generator }}" \
-          -DCMAKE_BUILD_TYPE=Release \
+        echo "Current directory: $PWD"
+        echo "Setting CMAKE_INSTALL_PREFIX to: $PWD/build/install"
+        cmake -B build \
+          -G "${{ matrix.cmake_generator }}" \
           -Dclang-tidy.cmake_BUILD_TESTS=ON \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-          -DCMAKE_INSTALL_PREFIX=install
+          -DCMAKE_INSTALL_PREFIX="$PWD/build/install"
 
     - name: Build
-      run: cmake --build build --config Release
+      run: cmake --build build
 
     - name: Test
       working-directory: build
-      run: ctest -C Release --output-on-failure --verbose
+      run: ctest --output-on-failure --verbose

@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(clang-tidy.cmake VERSION 1.1.0)
 
+include(GNUInstallDirs)
 include(clang_tidy_functions.cmake)
 
 project_include_guard()
@@ -23,6 +24,7 @@ if(CLANG_TIDY_CMAKE_INSTALL OR ${PROJECT_NAME}_BUILD_TESTS)
     ADDITIONAL_FILES
     ${CMAKE_CURRENT_LIST_DIR}/list_file_include_guard.cmake
     ${CMAKE_CURRENT_LIST_DIR}/project_include_guard.cmake
+    ${CMAKE_CURRENT_LIST_DIR}/project_log.cmake
     ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy
     ADDITIONAL_FILES_DESTINATION
     ${CMAKE_INSTALL_DATADIR}/cmake/${PROJECT_NAME}

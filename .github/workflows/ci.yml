@@ -28,9 +28,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Ninja
-      uses: seanmiddleditch/gha-setup-ninja@master
-
     - name: Install clang-tidy (Ubuntu)
       if: matrix.os == 'ubuntu-24.04'
       run: |
@@ -58,26 +55,123 @@ jobs:
 
     - name: Install clang-tidy (Windows)
       if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
         choco install llvm --yes
         echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Configure CMake
+      shell: bash
       run: |
-        cmake -B build -G "${{ matrix.cmake_generator }}" `
-          -DCMAKE_BUILD_TYPE=Release `
-          -Dclang-tidy.cmake_BUILD_TESTS=ON `
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
-          -DCMAKE_INSTALL_PREFIX=install
-      shell: pwsh
+        echo "Current directory: $PWD"
+        echo "Setting CMAKE_INSTALL_PREFIX to: $PWD/build/install"
+        cmake -B build \
+          -G "${{ matrix.cmake_generator }}" \
+          -Dclang-tidy.cmake_BUILD_TESTS=ON \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          -DCMAKE_INSTALL_PREFIX="$PWD/build/install"
 
     - name: Build
-      run: cmake --build build --config Release
+      run: cmake --build build
+
+    - name: Debug install paths
+      shell: bash
+      run: |
+        echo "=== Checking CMAKE_INSTALL_PREFIX ==="
+        cmake -B build -N -LA | grep -i install || true
+        echo "=== Checking generated install script ==="
+        if [ -f build/cmake_install.cmake ]; then
+          grep -E "(CMAKE_INSTALL_PREFIX|DESTINATION|file\(INSTALL)" build/cmake_install.cmake | head -20 || true
+        fi
 
     - name: Install
       run: cmake --build build --target install
 
     - name: Test
       working-directory: build
-      run: ctest -C Release --output-on-failure --verbose
+      run: ctest --output-on-failure --verbose
+
+  tidy-fix-verification:
+    name: Verify Tidy Fix Workflow
+    runs-on: ubuntu-24.04
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install clang-tidy
+      run: |
+        sudo apt-get update
+        # Try to install the latest available clang-tidy
+        for version in 20 19 18 17 16; do
+          if sudo apt-get install -y clang-tidy-${version} 2>/dev/null; then
+            echo "Installed clang-tidy-${version}"
+            sudo ln -sf $(which clang-tidy-${version}) /usr/local/bin/clang-tidy
+            break
+          fi
+        done
+        # Fallback to default clang-tidy
+        if ! command -v clang-tidy &> /dev/null; then
+          sudo apt-get install -y clang-tidy
+        fi
+        clang-tidy --version
+
+    - name: Configure CMake
+      run: |
+        cmake -B build \
+          -G "Ninja" \
+          -Dclang-tidy.cmake_BUILD_TESTS=ON \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          -DCMAKE_INSTALL_PREFIX="$PWD/build/install"
+
+    - name: Initial Build
+      run: cmake --build build
+
+    - name: Install Package
+      run: cmake --build build --target install
+
+    - name: Check Initial Tidy Issues (Baseline)
+      id: baseline_tidy
+      continue-on-error: true
+      run: |
+        echo "=== Running baseline tidy check ==="
+        cmake --build build --target tidy 2>&1 | tee tidy_baseline.log
+        echo "Exit code: $?"
+        
+    - name: Apply Tidy Fixes
+      run: |
+        echo "=== Applying clang-tidy fixes ==="
+        cmake --build build --target tidy-fix
+        
+    - name: Show Applied Fixes
+      if: always()
+      run: |
+        echo "=== Showing git diff of applied fixes ==="
+        git diff --no-index --color=always tests/ 2>/dev/null || true
+        git status --short tests/ || true
+
+    - name: Rebuild After Fixes
+      run: |
+        echo "=== Rebuilding project with applied fixes ==="
+        cmake --build build --clean-first
+
+    - name: Verify No Tidy Issues Remain
+      run: |
+        echo "=== Verifying no tidy issues remain after fixes ==="
+        cmake --build build --target tidy
+        echo "✓ Tidy verification passed - no issues remain"
+
+    - name: Test Consumer with Tidy
+      run: |
+        echo "=== Testing consumer project with tidy ==="
+        # Configure consumer project
+        cmake -S tests/consumer -B build/consumer \
+          -DCMAKE_PREFIX_PATH=$PWD/build/install \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        
+        # Build consumer
+        cmake --build build/consumer
+        
+        # Run tidy on consumer
+        cmake --build build/consumer --target tidy
 

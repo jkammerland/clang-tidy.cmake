@@ -1,6 +1,6 @@
 if(NOT COMMAND list_file_include_guard)
   # This package contains all the dependencies for the clang-tidy.cmake package
-  find_package(target_install_package)
+  find_package(target_install_package QUIET)
 
   if(NOT target_install_package_FOUND)
     include(${CMAKE_CURRENT_LIST_DIR}/list_file_include_guard.cmake)
