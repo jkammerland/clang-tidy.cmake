@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-24.04
+            cmake_generator: "Ninja"
+            clang_tidy_names: "clang-tidy-20 clang-tidy-19 clang-tidy-18 clang-tidy"
+          - os: macos-latest
+            cmake_generator: "Ninja"
+            clang_tidy_names: "clang-tidy"
+          - os: windows-latest
+            cmake_generator: "Ninja"
+            clang_tidy_names: "clang-tidy"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Ninja
+      uses: seanmiddleditch/gha-setup-ninja@master
+
+    - name: Install clang-tidy (Ubuntu)
+      if: matrix.os == 'ubuntu-24.04'
+      run: |
+        sudo apt-get update
+        # Try to install the latest available clang-tidy
+        for version in 20 19 18 17 16; do
+          if sudo apt-get install -y clang-tidy-${version} 2>/dev/null; then
+            echo "Installed clang-tidy-${version}"
+            sudo ln -sf $(which clang-tidy-${version}) /usr/local/bin/clang-tidy
+            break
+          fi
+        done
+        # Fallback to default clang-tidy
+        if ! command -v clang-tidy &> /dev/null; then
+          sudo apt-get install -y clang-tidy
+        fi
+        clang-tidy --version
+
+    - name: Install clang-tidy (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install llvm
+        echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
+        echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+
+    - name: Install clang-tidy (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        choco install llvm --yes
+        echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -G "${{ matrix.cmake_generator }}" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -Dclang-tidy.cmake_BUILD_TESTS=ON `
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+          -DCMAKE_INSTALL_PREFIX=install
+      shell: pwsh
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Install
+      run: cmake --build build --target install
+
+    - name: Test
+      working-directory: build
+      run: ctest -C Release --output-on-failure --verbose
+
