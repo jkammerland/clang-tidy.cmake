@@ -64,12 +64,11 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -G "${{ matrix.cmake_generator }}" `
-          -DCMAKE_BUILD_TYPE=Release `
-          -Dclang-tidy.cmake_BUILD_TESTS=ON `
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+        cmake -B build -G "${{ matrix.cmake_generator }}" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -Dclang-tidy.cmake_BUILD_TESTS=ON \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           -DCMAKE_INSTALL_PREFIX=install
-      shell: pwsh
 
     - name: Build
       run: cmake --build build --config Release
