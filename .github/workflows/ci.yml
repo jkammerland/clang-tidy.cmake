@@ -63,20 +63,15 @@ jobs:
         echo "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: Configure CMake
-      run: |
-        cmake -B build -G "${{ matrix.cmake_generator }}" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -Dclang-tidy.cmake_BUILD_TESTS=ON \
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build/install
+      run: cmake -B build -G "${{ matrix.cmake_generator }}" -Dclang-tidy.cmake_BUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_INSTALL_PREFIX=build/install
 
     - name: Build
-      run: cmake --build build --config Release
+      run: cmake --build build
 
     - name: Install
       run: cmake --build build --target install
 
     - name: Test
       working-directory: build
-      run: ctest -C Release --output-on-failure --verbose
+      run: ctest --output-on-failure --verbose
 
