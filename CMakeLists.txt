@@ -49,12 +49,14 @@ set_property(GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY "")
 set_property(GLOBAL PROPERTY CLANG_TIDY_COMMON_SETUP_DONE OFF)
 
 if(NOT CMAKE_EXPORT_COMPILE_COMMANDS)
-  message(FATAL_ERROR "Compilation database is required by clang-tidy, set with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
+  project_log(FATAL_ERROR "Compilation database is required by clang-tidy, set with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
 endif()
 
 # --- Will control multi-threading of clang-tidy too ---
 set(TIDY_USES_TERMINAL OFF CACHE BOOL "Serializes output with colors, also makes it single threaded")
 set(TIDY_SINGLE_THREADED OFF CACHE BOOL "Single threaded clang-tidy")
+project_log(DEBUG "TIDY_USES_TERMINAL: ${TIDY_USES_TERMINAL}")
+project_log(DEBUG "TIDY_SINGLE_THREADED: ${TIDY_SINGLE_THREADED}, otherwise parallel per translation unit.")
 
 # Alias for the old function, for backwards compatibility
 function(target_tidy_sources TARGET_NAME)
@@ -65,13 +67,13 @@ function(register_project_sources TARGET_NAME)
   # Check if target was already registered
   get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
   if(${TARGET_NAME} IN_LIST REGISTERED_TARGETS)
-    message(WARNING "Target ${TARGET_NAME} was already registered for clang-tidy")
+    project_log(WARNING "Target ${TARGET_NAME} was already registered for clang-tidy")
     return()
   endif()
 
   get_target_property(TARGET_SOURCES ${TARGET_NAME} SOURCES)
   if(NOT TARGET_SOURCES)
-    message(WARNING "Target ${TARGET_NAME} has no sources or does not exist when registering for tidy.")
+    project_log(WARNING "Target ${TARGET_NAME} has no sources or does not exist when registering for tidy.")
     return()
   endif()
 
@@ -85,7 +87,7 @@ function(register_project_sources TARGET_NAME)
       get_target_property(TARGET_SOURCE_DIR ${TARGET_NAME} SOURCE_DIR)
       if(NOT TARGET_SOURCE_DIR)
         set(TARGET_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-        message(WARNING "Could not get SOURCE_DIR for target ${TARGET_NAME}. Using CMAKE_CURRENT_SOURCE_DIR (${CMAKE_CURRENT_SOURCE_DIR}) for resolving relative paths.")
+        project_log(WARNING "Could not get SOURCE_DIR for target ${TARGET_NAME}. Using CMAKE_CURRENT_SOURCE_DIR (${CMAKE_CURRENT_SOURCE_DIR}) for resolving relative paths.")
       endif()
       get_filename_component(ABS_FILE_PATH ${FILE_PATH_RELATIVE} ABSOLUTE BASE_DIR ${TARGET_SOURCE_DIR})
     endif()
@@ -97,7 +99,7 @@ function(register_project_sources TARGET_NAME)
         list(APPEND LOCAL_HEADERS_FOR_TARGET "${ABS_FILE_PATH}")
       endif()
     else()
-      message(WARNING "Tidy: File from target ${TARGET_NAME} not found: ${ABS_FILE_PATH} (original: ${FILE_PATH_RELATIVE} in ${TARGET_SOURCE_DIR})")
+      project_log(WARNING "Tidy: File from target ${TARGET_NAME} not found: ${ABS_FILE_PATH} (original: ${FILE_PATH_RELATIVE} in ${TARGET_SOURCE_DIR})")
     endif()
   endforeach()
 
@@ -156,7 +158,7 @@ function(_setup_clang_tidy_common)
       CACHE STRING "Regex for excluding headers from checking (optional, overrides ExcludeHeaderFilterRegex in .clang-tidy if set)")
 
   if(NOT ENABLE_CLANG_TIDY)
-    message(STATUS "Clang-tidy integration is disabled (ENABLE_CLANG_TIDY=OFF).")
+    project_log(STATUS "Clang-tidy integration is disabled (ENABLE_CLANG_TIDY=OFF).")
     return()
   endif()
 
@@ -166,7 +168,7 @@ function(_setup_clang_tidy_common)
     CLANG_TIDY_EXE
     NAMES clang-tidy clang-tidy-20 clang-tidy-19 clang-tidy-18 clang-tidy-17
     DOC "Path to clang-tidy executable" REQUIRED)
-  message(STATUS "Found clang-tidy: ${CLANG_TIDY_EXE}")
+  project_log(STATUS "Found clang-tidy: ${CLANG_TIDY_EXE}")
 
   set(TIDY_COMMON_ARGS "")
   # The -p argument tells clang-tidy where to find compile_commands.json
@@ -186,15 +188,15 @@ function(_setup_clang_tidy_common)
   endif()
 
   if(EXISTS "${CMAKE_SOURCE_DIR}/.clang-tidy")
-    message(STATUS "Using .clang-tidy configuration file from project root: ${CMAKE_SOURCE_DIR}/.clang-tidy")
+    project_log(STATUS "Using .clang-tidy configuration file from project root: ${CMAKE_SOURCE_DIR}/.clang-tidy")
     if(CLANG_TIDY_HEADER_FILTER AND NOT CLANG_TIDY_HEADER_FILTER STREQUAL "")
-      message(STATUS "  NOTE: CLANG_TIDY_HEADER_FILTER='${CLANG_TIDY_HEADER_FILTER}' overrides HeaderFilterRegex in .clang-tidy")
+      project_log(STATUS "  NOTE: CLANG_TIDY_HEADER_FILTER='${CLANG_TIDY_HEADER_FILTER}' overrides HeaderFilterRegex in .clang-tidy")
     endif()
     if(CLANG_TIDY_HEADER_EXCLUDE AND NOT CLANG_TIDY_HEADER_EXCLUDE STREQUAL "")
-      message(STATUS "  NOTE: CLANG_TIDY_HEADER_EXCLUDE='${CLANG_TIDY_HEADER_EXCLUDE}' overrides ExcludeHeaderFilterRegex in .clang-tidy")
+      project_log(STATUS "  NOTE: CLANG_TIDY_HEADER_EXCLUDE='${CLANG_TIDY_HEADER_EXCLUDE}' overrides ExcludeHeaderFilterRegex in .clang-tidy")
     endif()
   else()
-    message(WARNING "No .clang-tidy file found in project root (${CMAKE_SOURCE_DIR}/.clang-tidy). Clang-tidy will use its default checks. It is highly recommended to create a .clang-tidy file.")
+    project_log(WARNING "No .clang-tidy file found in project root (${CMAKE_SOURCE_DIR}/.clang-tidy). Clang-tidy will use its default checks. It is highly recommended to create a .clang-tidy file.")
   endif()
 
   set(TIDY_CHECK_ARGS ${TIDY_COMMON_ARGS})
@@ -246,7 +248,7 @@ endfunction()
 # Helper function to create tidy targets for a list of files
 function(_create_tidy_targets_for_files FILES_TO_PROCESS TARGET_NAME FIX_TARGET_NAME OPERATION_SCOPE)
   if(NOT FILES_TO_PROCESS)
-    message(WARNING "No files available for clang-tidy for ${OPERATION_SCOPE}. Tidy targets will do nothing.")
+    project_log(WARNING "No files available for clang-tidy for ${OPERATION_SCOPE}. Tidy targets will do nothing.")
     add_custom_target(${TARGET_NAME} COMMENT "No files to process with clang-tidy for ${OPERATION_SCOPE}.")
     add_custom_target(${FIX_TARGET_NAME} COMMENT "No files to process with clang-tidy (fix mode) for ${OPERATION_SCOPE}.")
     return()
@@ -278,14 +280,14 @@ function(_create_tidy_targets_for_files FILES_TO_PROCESS TARGET_NAME FIX_TARGET_
     list(APPEND TIDY_FIX_STAMP_FILES ${FIX_STAMP_FILE})
   endforeach()
 
-  message(VERBOSE "Creating clang-tidy target '${TARGET_NAME}' for checking ${OPERATION_SCOPE} (parallel per TU).")
+  project_log(VERBOSE "Creating clang-tidy target '${TARGET_NAME}' for checking ${OPERATION_SCOPE}.")
   add_custom_target(
     ${TARGET_NAME}
     DEPENDS ${TIDY_STAMP_FILES}
     COMMENT "Aggregated clang-tidy (check) for ${OPERATION_SCOPE}"
     VERBATIM)
 
-  message(VERBOSE "Creating clang-tidy target '${FIX_TARGET_NAME}' for applying fixes to ${OPERATION_SCOPE} (parallel per TU).")
+  project_log(VERBOSE "Creating clang-tidy target '${FIX_TARGET_NAME}' for applying fixes to ${OPERATION_SCOPE}.")
   add_custom_target(
     ${FIX_TARGET_NAME}
     DEPENDS ${TIDY_FIX_STAMP_FILES}
@@ -311,7 +313,7 @@ function(finalize_clang_tidy_target TARGET_NAME)
   get_property(FINALIZED_TARGETS GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY)
   list(FIND FINALIZED_TARGETS ${TARGET_NAME} ALREADY_FINALIZED)
   if(NOT ALREADY_FINALIZED EQUAL -1)
-    message(STATUS "Target ${TARGET_NAME} already has clang-tidy targets finalized")
+    project_log(STATUS "Target ${TARGET_NAME} already has clang-tidy targets finalized")
     return()
   endif()
 
@@ -319,7 +321,7 @@ function(finalize_clang_tidy_target TARGET_NAME)
   get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
   list(FIND REGISTERED_TARGETS ${TARGET_NAME} TARGET_INDEX)
   if(TARGET_INDEX EQUAL -1)
-    message(WARNING "Target ${TARGET_NAME} was not registered with register_project_sources()")
+    project_log(WARNING "Target ${TARGET_NAME} was not registered with register_project_sources()")
     return()
   endif()
 
@@ -349,10 +351,10 @@ function(finalize_clang_tidy_target TARGET_NAME)
       else()
         # File not in this target, no files to process
         set(FILES_TO_PROCESS "")
-        message(STATUS "CLANG_TIDY_FILE '${CLANG_TIDY_FILE}' is not part of target ${TARGET_NAME}")
+        project_log(STATUS "CLANG_TIDY_FILE '${CLANG_TIDY_FILE}' is not part of target ${TARGET_NAME}")
       endif()
     else()
-      message(WARNING "CLANG_TIDY_FILE specified ('${CLANG_TIDY_FILE}'), but not found at '${SPECIFIC_FILE}'.")
+      project_log(WARNING "CLANG_TIDY_FILE specified ('${CLANG_TIDY_FILE}'), but not found at '${SPECIFIC_FILE}'.")
     endif()
   endif()
 
@@ -398,9 +400,9 @@ function(finalize_clang_tidy_targets)
     if(EXISTS "${SPECIFIC_FILE}")
       set(CURRENT_FILES_TO_PROCESS "${SPECIFIC_FILE}")
       set(TIDY_OPERATION_SCOPE "specified file: ${CLANG_TIDY_FILE}")
-      message(STATUS "Clang-tidy targets will run on specific file: ${SPECIFIC_FILE}")
+      project_log(STATUS "Clang-tidy targets will run on specific file: ${SPECIFIC_FILE}")
     else()
-      message(WARNING "CLANG_TIDY_FILE specified ('${CLANG_TIDY_FILE}'), but not found at '${SPECIFIC_FILE}'. Running on ${TIDY_OPERATION_SCOPE}.")
+      project_log(WARNING "CLANG_TIDY_FILE specified ('${CLANG_TIDY_FILE}'), but not found at '${SPECIFIC_FILE}'. Running on ${TIDY_OPERATION_SCOPE}.")
     endif()
   endif()
 
@@ -413,8 +415,8 @@ function(finalize_clang_tidy_targets)
   foreach(TARGET_NAME ${REGISTERED_TARGETS})
     list(FIND FINALIZED_TARGETS ${TARGET_NAME} IS_FINALIZED)
     if(IS_FINALIZED EQUAL -1)
-      message(VERBOSE "Auto-finalizing clang-tidy targets for ${TARGET_NAME}")
-      finalize_clang_tidy_target(${TARGET_NAME})
+      project_log(DEBUG "Auto-finalizing clang-tidy targets for '${TARGET_NAME}'")
+      finalize_tidy_target(${TARGET_NAME})
     endif()
   endforeach()
 endfunction()
