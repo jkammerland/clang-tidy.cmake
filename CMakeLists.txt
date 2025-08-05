@@ -202,8 +202,7 @@ function(finalize_clang_tidy_targets)
       set(COMPILE_COMMANDS_JSON "${CMAKE_BINARY_DIR}/compile_commands.json")
 
       foreach(TU_FILE ${CURRENT_FILES_TO_PROCESS})
-        # Create a unique but predictable name for the stamp file based on the TU path
-        # Use CMAKE_PATH for proper cross-platform path handling
+        # Create a unique but predictable name for the stamp file based on the TU path Use CMAKE_PATH for proper cross-platform path handling
         cmake_path(GET TU_FILE FILENAME TU_FILENAME)
         cmake_path(GET TU_FILE PARENT_PATH TU_PARENT)
         cmake_path(HASH TU_PARENT TU_PARENT_HASH)
