@@ -11,4 +11,4 @@ add_executable(example main.cpp)
 register_project_sources(example)
 
 # Finalize clang-tidy targets
-finalize_clang_tidy_targets()
+finalize_tidy_targets()
