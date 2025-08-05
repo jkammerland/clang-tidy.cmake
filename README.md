@@ -8,7 +8,7 @@ include(FetchContent)
 FetchContent_Declare(
   ClangTidyCmake
   GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
-  GIT_TAG        1.0.4
+  GIT_TAG        1.1.0
 )
 
 FetchContent_MakeAvailable(ClangTidyCmake)
@@ -16,7 +16,7 @@ FetchContent_MakeAvailable(ClangTidyCmake)
 
 ### Using cpmaddpackage (FetchContent wrapper)
 ```cmake
-cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.0.4")
+cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.1.0")
 ```
 
 ### Manual install
@@ -46,7 +46,7 @@ target_tidy_sources(tests)
 
 # --- Finalize and Create Tidy Targets ---
 # This call MUST be at the end, after all targets and add_subdirectory calls.
-finalize_clang_tidy_targets()
+finalize_tidy_targets()
 ```
 
 ## Running
