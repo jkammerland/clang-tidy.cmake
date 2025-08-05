@@ -5,11 +5,11 @@
 
 int main() {
     // Use functions from header to ensure they're not optimized away
-    void* ptr = getPointer();
-    int magic = getMagicValue();
+    void* ptr = getPointer(); // NOLINT(clang-analyzer-deadcode.DeadStores)
+    int magic = getMagicValue(); // NOLINT(clang-analyzer-deadcode.DeadStores)
     
     std::vector<int> vec;
-    bool empty = checkVector(vec);
+    bool empty = checkVector(vec); // NOLINT(clang-analyzer-deadcode.DeadStores)
     
     processString("test");
     

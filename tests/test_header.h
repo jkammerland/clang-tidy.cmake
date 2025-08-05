@@ -4,7 +4,7 @@
 // Intentional clang-tidy violations to test header checking
 
 // modernize-use-nullptr violation
-void* getPointer() {
+void* getPointer() { // NOLINT(misc-definitions-in-headers)
     return 0;  // Should suggest nullptr
 }
 
@@ -14,7 +14,7 @@ inline int getMagicValue() {
 }
 
 // modernize-use-override violation
-class Base {
+class Base { // NOLINT(cppcoreguidelines-special-member-functions)
 public:
     virtual void doSomething() {}
     virtual ~Base() {}

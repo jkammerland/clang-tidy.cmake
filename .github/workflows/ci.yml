@@ -158,8 +158,21 @@ jobs:
     - name: Verify No Tidy Issues Remain
       run: |
         echo "=== Verifying no tidy issues remain after fixes ==="
-        cmake --build build --target tidy
-        echo "✓ Tidy verification passed - no issues remain"
+        # Run tidy and capture output
+        if cmake --build build --target tidy 2>&1 | tee tidy_final.log; then
+          echo "Tidy command succeeded, checking for warnings..."
+        else
+          echo "❌ Tidy command failed"
+          exit 1
+        fi
+        
+        # Check if there are any warnings in the output
+        if grep -E "warning:|error:" tidy_final.log; then
+          echo "❌ Tidy verification failed - warnings/errors found after fixes"
+          exit 1
+        else
+          echo "✓ Tidy verification passed - no issues remain"
+        fi
 
     - name: Test Consumer with Tidy
       run: |
