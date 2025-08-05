@@ -24,23 +24,33 @@ if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.clang-tidy)
   endif()
 endif()
 
-# --- Global CACHE variables for collected sources ---
-set(PROJECT_TRANSLATION_UNITS_FOR_TIDY
-    ""
-    CACHE INTERNAL "Collected TUs for clang-tidy")
-set(PROJECT_HEADERS_FOR_TIDY
-    ""
-    CACHE INTERNAL "Collected Headers for clang-tidy") # Headers are collected but not directly processed per-header by this script
-# --- Cache variables for per-target tidy support ---
-set(PROJECT_TARGETS_FOR_TIDY
-    ""
-    CACHE INTERNAL "List of targets registered for clang-tidy")
-set(PROJECT_FINALIZED_TARGETS_FOR_TIDY
-    ""
-    CACHE INTERNAL "List of targets that have been finalized for clang-tidy")
-set(CLANG_TIDY_COMMON_SETUP_DONE
-    OFF
-    CACHE INTERNAL "Flag indicating if common clang-tidy setup has been done")
+# --- Define global properties for collected sources ---
+define_property(GLOBAL PROPERTY PROJECT_TRANSLATION_UNITS_FOR_TIDY
+    BRIEF_DOCS "Collected translation units for clang-tidy"
+    FULL_DOCS "List of all translation units registered for clang-tidy processing")
+
+define_property(GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY
+    BRIEF_DOCS "Collected headers for clang-tidy"
+    FULL_DOCS "List of all headers registered for clang-tidy (collected but not directly processed)")
+
+define_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY
+    BRIEF_DOCS "List of targets registered for clang-tidy"
+    FULL_DOCS "List of all targets that have been registered with register_project_sources()")
+
+define_property(GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY
+    BRIEF_DOCS "List of finalized targets for clang-tidy"
+    FULL_DOCS "List of targets that have had their clang-tidy targets created")
+
+define_property(GLOBAL PROPERTY CLANG_TIDY_COMMON_SETUP_DONE
+    BRIEF_DOCS "Flag indicating if common clang-tidy setup has been done"
+    FULL_DOCS "Boolean flag to prevent duplicate clang-tidy configuration")
+
+# Initialize properties
+set_property(GLOBAL PROPERTY PROJECT_TRANSLATION_UNITS_FOR_TIDY "")
+set_property(GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY "")
+set_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY "")
+set_property(GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY "")
+set_property(GLOBAL PROPERTY CLANG_TIDY_COMMON_SETUP_DONE OFF)
 
 if(NOT CMAKE_EXPORT_COMPILE_COMMANDS)
   message(FATAL_ERROR "Compilation database is required by clang-tidy, set with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
@@ -56,9 +66,10 @@ function(target_tidy_sources TARGET_NAME)
 endfunction(target_tidy_sources)
 
 function(register_project_sources TARGET_NAME)
-  # Check if the global list variables are defined, error out if not (as a safeguard)
-  if(NOT DEFINED CACHE{PROJECT_TRANSLATION_UNITS_FOR_TIDY} OR NOT DEFINED CACHE{PROJECT_HEADERS_FOR_TIDY}) # Check cache existence
-    message(FATAL_ERROR "CACHE variables PROJECT_TRANSLATION_UNITS_FOR_TIDY and PROJECT_HEADERS_FOR_TIDY must be initialized before calling target_tidy_sources.")
+  # Check if target was already registered
+  get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
+  if(${TARGET_NAME} IN_LIST REGISTERED_TARGETS)
+    message(WARNING "Target ${TARGET_NAME} was already registered for clang-tidy")
     return()
   endif()
 
@@ -95,46 +106,38 @@ function(register_project_sources TARGET_NAME)
   endforeach()
 
   # Add target to the list of registered targets
-  set(TEMP_TARGETS ${PROJECT_TARGETS_FOR_TIDY})
+  get_property(TEMP_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
   list(APPEND TEMP_TARGETS ${TARGET_NAME})
-  list(REMOVE_DUPLICATES TEMP_TARGETS)
-  set(PROJECT_TARGETS_FOR_TIDY
-      ${TEMP_TARGETS}
-      CACHE INTERNAL "List of targets registered for clang-tidy" FORCE)
+  set_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY ${TEMP_TARGETS})
 
   # Store per-target source lists
   if(LOCAL_TUS_FOR_TARGET)
-    set(PROJECT_TUS_FOR_TIDY_${TARGET_NAME}
-        ${LOCAL_TUS_FOR_TARGET}
-        CACHE INTERNAL "TUs for clang-tidy for target ${TARGET_NAME}" FORCE)
+    define_property(GLOBAL PROPERTY PROJECT_TUS_FOR_TIDY_${TARGET_NAME})
+    set_property(GLOBAL PROPERTY PROJECT_TUS_FOR_TIDY_${TARGET_NAME} ${LOCAL_TUS_FOR_TARGET})
     
     # Also add to global list for backward compatibility
-    set(TEMP_TUS ${PROJECT_TRANSLATION_UNITS_FOR_TIDY})
+    get_property(TEMP_TUS GLOBAL PROPERTY PROJECT_TRANSLATION_UNITS_FOR_TIDY)
     list(APPEND TEMP_TUS ${LOCAL_TUS_FOR_TARGET})
     list(REMOVE_DUPLICATES TEMP_TUS)
-    set(PROJECT_TRANSLATION_UNITS_FOR_TIDY
-        ${TEMP_TUS}
-        CACHE INTERNAL "Collected TUs for clang-tidy" FORCE)
+    set_property(GLOBAL PROPERTY PROJECT_TRANSLATION_UNITS_FOR_TIDY ${TEMP_TUS})
   endif()
 
   if(LOCAL_HEADERS_FOR_TARGET)
-    set(PROJECT_HEADERS_FOR_TIDY_${TARGET_NAME}
-        ${LOCAL_HEADERS_FOR_TARGET}
-        CACHE INTERNAL "Headers for clang-tidy for target ${TARGET_NAME}" FORCE)
+    define_property(GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY_${TARGET_NAME})
+    set_property(GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY_${TARGET_NAME} ${LOCAL_HEADERS_FOR_TARGET})
     
     # Also add to global list for backward compatibility
-    set(TEMP_HEADERS ${PROJECT_HEADERS_FOR_TIDY})
+    get_property(TEMP_HEADERS GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY)
     list(APPEND TEMP_HEADERS ${LOCAL_HEADERS_FOR_TARGET})
     list(REMOVE_DUPLICATES TEMP_HEADERS)
-    set(PROJECT_HEADERS_FOR_TIDY
-        ${TEMP_HEADERS}
-        CACHE INTERNAL "Collected Headers for clang-tidy" FORCE)
+    set_property(GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY ${TEMP_HEADERS})
   endif()
 endfunction()
 
 # Helper function to setup common clang-tidy configuration
 function(_setup_clang_tidy_common)
-  if(CLANG_TIDY_COMMON_SETUP_DONE)
+  get_property(SETUP_DONE GLOBAL PROPERTY CLANG_TIDY_COMMON_SETUP_DONE)
+  if(SETUP_DONE)
     return()
   endif()
 
@@ -208,9 +211,7 @@ function(_setup_clang_tidy_common)
   set(TIDY_FIX_ARGS ${TIDY_FIX_ARGS} PARENT_SCOPE)
   set(ENABLE_CLANG_TIDY ${ENABLE_CLANG_TIDY} PARENT_SCOPE)
 
-  set(CLANG_TIDY_COMMON_SETUP_DONE
-      ON
-      CACHE INTERNAL "Flag indicating if common clang-tidy setup has been done" FORCE)
+  set_property(GLOBAL PROPERTY CLANG_TIDY_COMMON_SETUP_DONE ON)
 endfunction()
 
 # Helper function to create a custom command for tidying a single file
@@ -311,23 +312,24 @@ function(finalize_clang_tidy_target TARGET_NAME)
   endif()
 
   # Check if target is already finalized
-  list(FIND PROJECT_FINALIZED_TARGETS_FOR_TIDY ${TARGET_NAME} ALREADY_FINALIZED)
+  get_property(FINALIZED_TARGETS GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY)
+  list(FIND FINALIZED_TARGETS ${TARGET_NAME} ALREADY_FINALIZED)
   if(NOT ALREADY_FINALIZED EQUAL -1)
     message(STATUS "Target ${TARGET_NAME} already has clang-tidy targets finalized")
     return()
   endif()
 
   # Check if target is registered
-  list(FIND PROJECT_TARGETS_FOR_TIDY ${TARGET_NAME} TARGET_INDEX)
+  get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
+  list(FIND REGISTERED_TARGETS ${TARGET_NAME} TARGET_INDEX)
   if(TARGET_INDEX EQUAL -1)
     message(WARNING "Target ${TARGET_NAME} was not registered with register_project_sources()")
     return()
   endif()
 
   # Get target-specific translation units
-  if(DEFINED CACHE{PROJECT_TUS_FOR_TIDY_${TARGET_NAME}})
-    set(TARGET_TUS ${PROJECT_TUS_FOR_TIDY_${TARGET_NAME}})
-  else()
+  get_property(TARGET_TUS GLOBAL PROPERTY PROJECT_TUS_FOR_TIDY_${TARGET_NAME})
+  if(NOT TARGET_TUS)
     set(TARGET_TUS "")
   endif()
 
@@ -365,11 +367,9 @@ function(finalize_clang_tidy_target TARGET_NAME)
   _create_tidy_targets_for_files("${FILES_TO_PROCESS}" ${TARGET_TIDY_NAME} ${TARGET_TIDY_FIX_NAME} "${OPERATION_SCOPE}")
 
   # Mark target as finalized
-  set(TEMP_FINALIZED ${PROJECT_FINALIZED_TARGETS_FOR_TIDY})
+  get_property(TEMP_FINALIZED GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY)
   list(APPEND TEMP_FINALIZED ${TARGET_NAME})
-  set(PROJECT_FINALIZED_TARGETS_FOR_TIDY
-      ${TEMP_FINALIZED}
-      CACHE INTERNAL "List of targets that have been finalized for clang-tidy" FORCE)
+  set_property(GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY ${TEMP_FINALIZED})
 endfunction()
 
 # Alias function for backward compatibility
@@ -378,9 +378,7 @@ function(finalize_tidy_targets)
 endfunction(finalize_tidy_targets)
 
 function(finalize_clang_tidy_targets)
-  if(NOT DEFINED CACHE{PROJECT_TRANSLATION_UNITS_FOR_TIDY})
-    message(FATAL_ERROR "CACHE variable PROJECT_TRANSLATION_UNITS_FOR_TIDY must be initialized before calling finalize_clang_tidy_targets.")
-  endif()
+  # Properties are always defined, so no need to check
 
   # Setup common clang-tidy configuration
   _setup_clang_tidy_common()
@@ -390,7 +388,7 @@ function(finalize_clang_tidy_targets)
   endif()
 
   # Create global tidy targets using all collected files
-  set(CURRENT_FILES_TO_PROCESS ${PROJECT_TRANSLATION_UNITS_FOR_TIDY})
+  get_property(CURRENT_FILES_TO_PROCESS GLOBAL PROPERTY PROJECT_TRANSLATION_UNITS_FOR_TIDY)
   set(TIDY_OPERATION_SCOPE "all registered project translation units")
 
   # Handle CLANG_TIDY_FILE option for global targets
@@ -414,8 +412,10 @@ function(finalize_clang_tidy_targets)
   _create_tidy_targets_for_files("${CURRENT_FILES_TO_PROCESS}" ${CLANG_TIDY_TARGET_NAME} ${CLANG_TIDY_FIX_TARGET_NAME} "${TIDY_OPERATION_SCOPE}")
 
   # Finalize any registered targets that haven't been explicitly finalized
-  foreach(TARGET_NAME ${PROJECT_TARGETS_FOR_TIDY})
-    list(FIND PROJECT_FINALIZED_TARGETS_FOR_TIDY ${TARGET_NAME} IS_FINALIZED)
+  get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
+  get_property(FINALIZED_TARGETS GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY)
+  foreach(TARGET_NAME ${REGISTERED_TARGETS})
+    list(FIND FINALIZED_TARGETS ${TARGET_NAME} IS_FINALIZED)
     if(IS_FINALIZED EQUAL -1)
       message(STATUS "Auto-finalizing clang-tidy targets for ${TARGET_NAME}")
       finalize_clang_tidy_target(${TARGET_NAME})
