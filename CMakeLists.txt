@@ -7,6 +7,7 @@ if(NOT COMMAND list_file_include_guard)
   if(NOT target_install_package_FOUND)
     include(list_file_include_guard.cmake)
     include(project_include_guard.cmake)
+    include(project_log.cmake)
   else()
     project_log(VERBOSE "target_install_package found, using project_include_guard from target_install_package")
   endif()
@@ -15,13 +16,8 @@ endif()
 project_include_guard()
 
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.clang-tidy)
-  if(COMMAND project_log)
-    project_log(VERBOSE "No .clang-tidy file found in project root, you can use this for reference:")
-    project_log(VERBOSE "--> ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy")
-  else()
-    message(VERBOSE "No .clang-tidy file found in project root, you can use this for reference:")
-    message(VERBOSE "--> ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy")
-  endif()
+  project_log(VERBOSE "No .clang-tidy file found in project root, you can use this for reference:")
+  project_log(VERBOSE "--> ${CMAKE_CURRENT_LIST_DIR}/.clang-tidy")
 endif()
 
 # --- Define global properties for collected sources ---
@@ -57,8 +53,8 @@ if(NOT CMAKE_EXPORT_COMPILE_COMMANDS)
 endif()
 
 # --- Will control multi-threading of clang-tidy too ---
-option(TIDY_USES_TERMINAL "Serializes output with colors, also makes it single threaded" OFF)
-option(TIDY_SINGLE_THREADED "Single threaded clang-tidy" OFF)
+set(TIDY_USES_TERMINAL OFF CACHE BOOL "Serializes output with colors, also makes it single threaded")
+set(TIDY_SINGLE_THREADED OFF CACHE BOOL "Single threaded clang-tidy")
 
 # Alias for the old function, for backwards compatibility
 function(target_tidy_sources TARGET_NAME)
@@ -282,14 +278,14 @@ function(_create_tidy_targets_for_files FILES_TO_PROCESS TARGET_NAME FIX_TARGET_
     list(APPEND TIDY_FIX_STAMP_FILES ${FIX_STAMP_FILE})
   endforeach()
 
-  message(STATUS "Creating clang-tidy target '${TARGET_NAME}' for checking ${OPERATION_SCOPE} (parallel per TU).")
+  message(VERBOSE "Creating clang-tidy target '${TARGET_NAME}' for checking ${OPERATION_SCOPE} (parallel per TU).")
   add_custom_target(
     ${TARGET_NAME}
     DEPENDS ${TIDY_STAMP_FILES}
     COMMENT "Aggregated clang-tidy (check) for ${OPERATION_SCOPE}"
     VERBATIM)
 
-  message(STATUS "Creating clang-tidy target '${FIX_TARGET_NAME}' for applying fixes to ${OPERATION_SCOPE} (parallel per TU).")
+  message(VERBOSE "Creating clang-tidy target '${FIX_TARGET_NAME}' for applying fixes to ${OPERATION_SCOPE} (parallel per TU).")
   add_custom_target(
     ${FIX_TARGET_NAME}
     DEPENDS ${TIDY_FIX_STAMP_FILES}
@@ -417,27 +413,16 @@ function(finalize_clang_tidy_targets)
   foreach(TARGET_NAME ${REGISTERED_TARGETS})
     list(FIND FINALIZED_TARGETS ${TARGET_NAME} IS_FINALIZED)
     if(IS_FINALIZED EQUAL -1)
-      message(STATUS "Auto-finalizing clang-tidy targets for ${TARGET_NAME}")
+      message(VERBOSE "Auto-finalizing clang-tidy targets for ${TARGET_NAME}")
       finalize_clang_tidy_target(${TARGET_NAME})
     endif()
   endforeach()
 endfunction()
 
-option(${PROJECT_NAME}_BUILD_TESTS "Build tests for clang-tidy" OFF)
-if(${PROJECT_NAME}_BUILD_TESTS)
-  include(CTest)
-  enable_testing()
-  add_subdirectory(tests)
+set(CLANG_TIDY_CMAKE_INSTALL OFF CACHE BOOL "Install clang-tidy.cmake")
+set(${PROJECT_NAME}_BUILD_TESTS OFF CACHE BOOL "Build tests for clang-tidy")
 
-  # --- Finalize and Create Tidy Targets ---
-  # This call MUST be at the end, after all targets and add_subdirectory calls.
-  finalize_tidy_targets()
-endif()
-
-set(CLANG_TIDY_CMAKE_INSTALL
-    "OFF"
-    CACHE BOOL "Install clang-tidy.cmake")
-if(CLANG_TIDY_CMAKE_INSTALL)
+if(CLANG_TIDY_CMAKE_INSTALL OR ${PROJECT_NAME}_BUILD_TESTS)
   if(NOT target_install_package_FOUND)
     include(FetchContent)
     FetchContent_Declare(
@@ -463,4 +448,14 @@ if(CLANG_TIDY_CMAKE_INSTALL)
     "ClangTidy"
     DEVELOPMENT_COMPONENT
     "ClangTidy")
+endif()
+
+if(${PROJECT_NAME}_BUILD_TESTS)
+  include(CTest)
+  enable_testing()
+  add_subdirectory(tests)
+
+  # --- Finalize and Create Tidy Targets ---
+  # This call MUST be at the end, after all targets and add_subdirectory calls.
+  finalize_tidy_targets()
 endif()
