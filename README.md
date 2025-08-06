@@ -53,32 +53,40 @@ This creates:
 ## Configuration Options
 
 *   **Disable clang-tidy entirely** (can save configuration time):
-    ```bash
-    cmake .. -DENABLE_CLANG_TIDY=OFF
-    ```
+```bash
+cmake .. -DENABLE_CLANG_TIDY=OFF
+```
 *   **Single-threaded mode** (default is multi-threaded):
-    ```bash
-    cmake .. -DTIDY_SINGLE_THREADED=ON
-    ```
+```bash
+cmake .. -DTIDY_SINGLE_THREADED=ON
+```
 
 ## Running
 
 1.  **Configure CMake:**
-    ```bash
-    mkdir build && cd build
-    cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-    ```
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+```
 
-2.  **Run Tidy Targets:**
-    *   **Check for issues (read-only):**
-        ```bash
-        cmake --build . --target tidy
-        # or: make tidy / ninja tidy
-        ```
-    *   **Apply fixes:**
-        ```bash
-        cmake --build . --target tidy-fix
-        # or: make tidy-fix / ninja tidy-fix
-        ```
+2.  **List Available Tidy Targets:**
+    
+> [!TIP]
+> To see all tidy targets:
+> ```bash
+> cmake --build . --target help | grep "^... tidy"
+> ```
+
+3.  **Run Tidy Targets:**
+*   **Global targets** (all registered sources):
+    ```bash
+    cmake --build . --target tidy        # Check for issues
+    cmake --build . --target tidy-fix    # Apply fixes
+    ```
+*   **Per-target** (specific target only):
+    ```bash
+    cmake --build . --target tidy-mylib        # Check mylib only
+    cmake --build . --target tidy-mylib-fix    # Apply fixes to mylib only
+    ```
 
 A cross-platform way to integrate `clang-tidy` into your build process, respecting your existing `.clang-tidy` configuration and allowing both full project and single-file analysis.
