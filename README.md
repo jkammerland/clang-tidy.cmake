@@ -8,7 +8,7 @@ include(FetchContent)
 FetchContent_Declare(
   ClangTidyCmake
   GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
-  GIT_TAG        1.1.0
+  GIT_TAG        1.2.0
 )
 
 FetchContent_MakeAvailable(ClangTidyCmake)
@@ -16,7 +16,7 @@ FetchContent_MakeAvailable(ClangTidyCmake)
 
 ### Using cpmaddpackage (FetchContent wrapper)
 ```cmake
-cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.1.0")
+cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.2.0")
 ```
 
 ### Manual install
@@ -35,73 +35,39 @@ find_package(clang-tidy.cmake CONFIG REQUIRED)
 
 ## Usage Example
 
-### Basic Usage - Global Tidy Targets
-
 ```cmake
 file(GLOB TIDY_TESTS CONFIGURE_DEPENDS "*.cpp")
 add_executable(tests ${TIDY_TESTS})
 target_tidy_sources(tests)  # Register target for tidy
 
-# Other targets...
-# target_tidy_sources(...)
-# ...
+add_library(mylib src/lib.cpp)
+target_tidy_sources(mylib)  # Register another target
 
-# --- Finalize and Create Tidy Targets ---
-# This call MUST be at the end, after all targets and add_subdirectory calls.
-finalize_tidy_targets()
+# Tidy targets are automatically created at the end of configuration
 ```
 
-### Per-Target Tidy
+This creates:
+- Global targets: `tidy` and `tidy-fix` (process all registered sources)
+- Per-target: `tidy-tests`, `tidy-tests-fix`, `tidy-mylib`, `tidy-mylib-fix`
 
-You can create individual tidy targets for specific CMake targets without waiting for the global finalize:
+## Configuration Options
 
-```cmake
-add_executable(myapp src/main.cpp src/utils.cpp)
-target_tidy_sources(myapp)  # Register target
-finalize_tidy_target(myapp) # Create tidy targets immediately
-
-# This creates:
-#   tidy-myapp     - Check only myapp's sources
-#   tidy-myapp-fix - Apply fixes to myapp's sources
-
-add_library(mylib src/lib.cpp src/helper.cpp)
-target_tidy_sources(mylib)  # Register target
-finalize_tidy_target(mylib) # Create tidy targets immediately
-
-# This creates:
-#   tidy-mylib     - Check only mylib's sources
-#   tidy-mylib-fix - Apply fixes to mylib's sources
-
-# Later, at the end of your CMakeLists.txt:
-finalize_tidy_targets()  # Creates global targets and auto-finalizes any remaining
-```
-
-### How Per-Target and Global Targets Interact
-
-1. **Registration**: `target_tidy_sources(target)` registers a target's sources for tidy processing
-2. **Per-Target Finalization**: `finalize_tidy_target(target)` creates target-specific tidy targets immediately
-3. **Global Finalization**: `finalize_tidy_targets()` does two things:
-   - Creates global `tidy` and `tidy-fix` targets that process ALL registered sources
-   - Auto-finalizes any registered targets that haven't been explicitly finalized yet
-
-**Important Notes:**
-- Each target can only be finalized once - subsequent calls are safely ignored
-- The global `tidy` target always includes ALL registered sources, regardless of per-target finalization
-- Per-target tidy targets are independent - you can run `tidy-myapp` without affecting other targets
-- If you never call `finalize_tidy_target()`, the global `finalize_tidy_targets()` will create per-target targets automatically
+*   **Disable clang-tidy entirely** (can save configuration time):
+    ```bash
+    cmake .. -DENABLE_CLANG_TIDY=OFF
+    ```
+*   **Single-threaded mode** (default is multi-threaded):
+    ```bash
+    cmake .. -DTIDY_SINGLE_THREADED=ON
+    ```
 
 ## Running
 
 1.  **Configure CMake:**
     ```bash
     mkdir build && cd build
-    cmake ..
-    # Do not forget to set the compile_commands.json!
-    # Can be generated with:
-    # cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     ```
-    *   Single-threaded option (default is automatic multi-threaded):
-        `cmake .. -DTIDY_SINGLE_THREADED=ON`
 
 2.  **Run Tidy Targets:**
     *   **Check for issues (read-only):**

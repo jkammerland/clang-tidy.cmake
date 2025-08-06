@@ -12,7 +12,4 @@ add_executable(example main.cpp)
 set_target_properties(example PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
 
 # Register sources for clang-tidy
-register_project_sources(example)
-
-# Finalize clang-tidy targets
-finalize_tidy_targets()
+target_tidy_sources(example)

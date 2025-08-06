@@ -11,7 +11,7 @@ if(NOT COMMAND list_file_include_guard)
   endif()
 endif()
 
-list_file_include_guard(VERSION 1.1.0)
+list_file_include_guard(VERSION 1.2.0)
 
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.clang-tidy)
   project_log(VERBOSE "No .clang-tidy file found in project root, you can use this for reference:")
@@ -29,7 +29,7 @@ define_property(GLOBAL PROPERTY PROJECT_HEADERS_FOR_TIDY
 
 define_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY
     BRIEF_DOCS "List of targets registered for clang-tidy"
-    FULL_DOCS "List of all targets that have been registered with register_project_sources()")
+    FULL_DOCS "List of all targets that have been registered with target_tidy_sources()")
 
 define_property(GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY
     BRIEF_DOCS "List of finalized targets for clang-tidy"
@@ -46,22 +46,30 @@ set_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY "")
 set_property(GLOBAL PROPERTY PROJECT_FINALIZED_TARGETS_FOR_TIDY "")
 set_property(GLOBAL PROPERTY CLANG_TIDY_COMMON_SETUP_DONE OFF)
 
-if(NOT CMAKE_EXPORT_COMPILE_COMMANDS)
+option(ENABLE_CLANG_TIDY "Enable clang-tidy integration" ON)
+
+if(NOT ENABLE_CLANG_TIDY)
+  project_log(STATUS "Clang-tidy integration is disabled (ENABLE_CLANG_TIDY=OFF)")
+endif()
+
+if(ENABLE_CLANG_TIDY AND NOT CMAKE_EXPORT_COMPILE_COMMANDS)
   project_log(FATAL_ERROR "Compilation database is required by clang-tidy, set with -DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
 endif()
 
 # --- Will control multi-threading of clang-tidy too ---
 option(TIDY_USES_TERMINAL "Serializes output with colors, also makes it single threaded" OFF)
 option(TIDY_SINGLE_THREADED "Single threaded clang-tidy" OFF)
-project_log(DEBUG "TIDY_USES_TERMINAL: ${TIDY_USES_TERMINAL}")
-project_log(DEBUG "TIDY_SINGLE_THREADED: ${TIDY_SINGLE_THREADED}, otherwise parallel per translation unit.")
+if(ENABLE_CLANG_TIDY)
+  project_log(DEBUG "TIDY_USES_TERMINAL: ${TIDY_USES_TERMINAL}")
+  project_log(DEBUG "TIDY_SINGLE_THREADED: ${TIDY_SINGLE_THREADED}, otherwise parallel per translation unit.")
+endif()
 
-# Alias for the old function, for backwards compatibility
 function(target_tidy_sources TARGET_NAME)
-  register_project_sources(${TARGET_NAME})
-endfunction(target_tidy_sources)
-
-function(register_project_sources TARGET_NAME)
+  # Early return if clang-tidy is disabled
+  if(NOT ENABLE_CLANG_TIDY)
+    return()
+  endif()
+  
   # Check if target was already registered
   get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
   if(${TARGET_NAME} IN_LIST REGISTERED_TARGETS)
@@ -69,9 +77,30 @@ function(register_project_sources TARGET_NAME)
     return()
   endif()
 
+  # Just add target to the list of registered targets - sources will be collected later
+  get_property(TEMP_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
+  list(APPEND TEMP_TARGETS ${TARGET_NAME})
+  set_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY ${TEMP_TARGETS})
+  
+  # Auto-schedule finalization at the end of the top-level CMakeLists.txt
+  get_property(auto_finalize_scheduled GLOBAL PROPERTY TIDY_AUTO_FINALIZE_SCHEDULED)
+  if(NOT auto_finalize_scheduled)
+    project_log(DEBUG "Scheduling automatic finalization of clang-tidy targets at end of configuration")
+    cmake_language(DEFER DIRECTORY ${CMAKE_SOURCE_DIR} CALL _auto_finalize_all_tidy_targets)
+    set_property(GLOBAL PROPERTY TIDY_AUTO_FINALIZE_SCHEDULED TRUE)
+  endif()
+endfunction()
+
+# Backward compatibility - old function name
+function(register_project_sources TARGET_NAME)
+  target_tidy_sources(${TARGET_NAME})
+endfunction()
+
+# Internal function to collect sources from a target
+function(_collect_target_sources_for_tidy TARGET_NAME)
   get_target_property(TARGET_SOURCES ${TARGET_NAME} SOURCES)
   if(NOT TARGET_SOURCES)
-    project_log(WARNING "Target ${TARGET_NAME} has no sources or does not exist when registering for tidy.")
+    project_log(WARNING "Target ${TARGET_NAME} has no sources when collecting for tidy.")
     return()
   endif()
 
@@ -100,11 +129,6 @@ function(register_project_sources TARGET_NAME)
       project_log(WARNING "Tidy: File from target ${TARGET_NAME} not found: ${ABS_FILE_PATH} (original: ${FILE_PATH_RELATIVE} in ${TARGET_SOURCE_DIR})")
     endif()
   endforeach()
-
-  # Add target to the list of registered targets
-  get_property(TEMP_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
-  list(APPEND TEMP_TARGETS ${TARGET_NAME})
-  set_property(GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY ${TEMP_TARGETS})
 
   # Store per-target source lists
   if(LOCAL_TUS_FOR_TARGET)
@@ -137,7 +161,6 @@ function(_setup_clang_tidy_common)
     return()
   endif()
 
-  option(ENABLE_CLANG_TIDY "Enable clang-tidy integration" ON)
   option(CLANG_TIDY_APPLY_FIXES_BY_DEFAULT "Hint that clang-tidy should apply fixes (use clang-tidy-fix target)" OFF)
   set(CLANG_TIDY_FILE
       ""
@@ -298,7 +321,7 @@ function(finalize_tidy_target TARGET_NAME)
   finalize_clang_tidy_target(${TARGET_NAME})
 endfunction()
 
-# Function to finalize clang-tidy targets for a specific target
+# Function to finalize clang-tidy targets for a specific target (kept for backward compatibility)
 function(finalize_clang_tidy_target TARGET_NAME)
   # Setup common clang-tidy configuration if not already done
   _setup_clang_tidy_common()
@@ -319,8 +342,15 @@ function(finalize_clang_tidy_target TARGET_NAME)
   get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
   list(FIND REGISTERED_TARGETS ${TARGET_NAME} TARGET_INDEX)
   if(TARGET_INDEX EQUAL -1)
-    project_log(WARNING "Target ${TARGET_NAME} was not registered with register_project_sources()")
+    project_log(WARNING "Target ${TARGET_NAME} was not registered with target_tidy_sources()")
     return()
+  endif()
+  
+  # Collect sources for this target if not already done
+  get_property(TARGET_SOURCES_COLLECTED GLOBAL PROPERTY PROJECT_SOURCES_COLLECTED_${TARGET_NAME})
+  if(NOT TARGET_SOURCES_COLLECTED)
+    _collect_target_sources_for_tidy(${TARGET_NAME})
+    set_property(GLOBAL PROPERTY PROJECT_SOURCES_COLLECTED_${TARGET_NAME} TRUE)
   endif()
 
   # Get target-specific translation units
@@ -374,14 +404,30 @@ function(finalize_tidy_targets)
 endfunction(finalize_tidy_targets)
 
 function(finalize_clang_tidy_targets)
-  # Properties are always defined, so no need to check
+  # Manual finalization - just call the auto-finalize function
+  project_log(DEBUG "Manual finalization requested, processing all registered targets")
+  _auto_finalize_all_tidy_targets()
+endfunction()
 
+# Internal function that is automatically called at the end of configuration
+function(_auto_finalize_all_tidy_targets)
   # Setup common clang-tidy configuration
   _setup_clang_tidy_common()
   
   if(NOT ENABLE_CLANG_TIDY)
     return()
   endif()
+  
+  # Collect sources from all registered targets
+  get_property(REGISTERED_TARGETS GLOBAL PROPERTY PROJECT_TARGETS_FOR_TIDY)
+  foreach(TARGET_NAME ${REGISTERED_TARGETS})
+    # Collect sources if not already done
+    get_property(TARGET_SOURCES_COLLECTED GLOBAL PROPERTY PROJECT_SOURCES_COLLECTED_${TARGET_NAME})
+    if(NOT TARGET_SOURCES_COLLECTED)
+      _collect_target_sources_for_tidy(${TARGET_NAME})
+      set_property(GLOBAL PROPERTY PROJECT_SOURCES_COLLECTED_${TARGET_NAME} TRUE)
+    endif()
+  endforeach()
 
   # Create global tidy targets using all collected files
   get_property(CURRENT_FILES_TO_PROCESS GLOBAL PROPERTY PROJECT_TRANSLATION_UNITS_FOR_TIDY)

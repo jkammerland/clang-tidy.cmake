@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(clang-tidy.cmake VERSION 1.1.0)
+project(clang-tidy.cmake VERSION 1.2.0)
 
 include(GNUInstallDirs)
 include(clang_tidy_functions.cmake)
@@ -40,8 +40,4 @@ if(${PROJECT_NAME}_BUILD_TESTS)
   include(CTest)
   enable_testing()
   add_subdirectory(tests)
-
-  # --- Finalize and Create Tidy Targets ---
-  # This call MUST be at the end, after all targets and add_subdirectory calls.
-  finalize_tidy_targets()
 endif()
