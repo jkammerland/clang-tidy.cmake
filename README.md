@@ -8,12 +8,12 @@ include(FetchContent)
 FetchContent_Declare(
   ClangTidyCmake
   GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
-  GIT_TAG        1.2.0
+  GIT_TAG        1.2.1
 )
 
 FetchContent_MakeAvailable(ClangTidyCmake)
 # or 
-# cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.2.0")
+# cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.2.1")
 ```
 
 Usually you should wrap this to avoid exposing tidy to a consumer of this CMake project, e.g
@@ -26,7 +26,7 @@ if(${PROJECT_NAME}_ENABLE_CLANG_TIDY_CMAKE)
   FetchContent_Declare(
     ClangTidyCmake
     GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
-    GIT_TAG 1.2.0
+    GIT_TAG 1.2.1
     # Optional arg to first try find_package locally before fetching, see manual installation
     # NOTE: This must be called last, with 0 to N args following FIND_PACKAGE_ARGS
     # FIND_PACKAGE_ARGS
@@ -69,6 +69,13 @@ This creates:
 - Global targets: `tidy` and `tidy-fix` (process all registered sources)
 - Per-target: `tidy-tests`, `tidy-tests-fix`, `tidy-mylib`, `tidy-mylib-fix`
 
+E.g, the tests from this repo look like this:
+
+[demo](https://github.com/user-attachments/assets/4e9afb19-c1b9-4b83-90d5-38d7e3b002be)
+
+> [!TIP]
+> Some tidy issues can be automatically fixed by tidy itself, this library creates CMake custom targets to apply these fixes.
+
 ## Configuration Options
 
 *   **Disable clang-tidy entirely** (can save configuration time):
@@ -93,7 +100,7 @@ cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 > [!TIP]
 > To see all tidy targets:
 > ```bash
-> cmake --build . --target help | grep "^... tidy"
+> cmake --build . --target help | grep ".*: phony" | grep -v "/" | cut -d: -f1 | grep tidy
 > ```
 
 3.  **Run Tidy Targets:**

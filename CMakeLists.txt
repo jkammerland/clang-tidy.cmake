@@ -1,24 +1,26 @@
 cmake_minimum_required(VERSION 3.25)
-project(clang-tidy.cmake VERSION 1.2.0)
+project(clang-tidy.cmake VERSION 1.2.1)
 
-include(GNUInstallDirs)
+# Also has list_file_include_guard
 include(clang_tidy_functions.cmake)
 
+# add_subdirectory guard (should never happen in any sane project)
 project_include_guard()
 
 if(CLANG_TIDY_CMAKE_INSTALL OR ${PROJECT_NAME}_BUILD_TESTS)
-  if(NOT target_install_package_FOUND)
-    # Some tests are dependent on installing the project in the build directory
-    include(FetchContent)
-    FetchContent_Declare(
-      target_install_package
-      GIT_REPOSITORY https://github.com/jkammerland/target_install_package.cmake.git
-      GIT_TAG v5.3.1)
-    FetchContent_MakeAvailable(target_install_package)
-  endif()
+  # For the tests, we need to install target_install_package for a so that we can test a consumer
+  include(FetchContent)
+  FetchContent_Declare(
+    target_install_package
+    GIT_REPOSITORY https://github.com/jkammerland/target_install_package.cmake.git
+    GIT_TAG v5.6.2
+    FIND_PACKAGE_ARGS)
+  FetchContent_MakeAvailable(target_install_package)
 
+  # Dummy target that can be installed
   add_library(${PROJECT_NAME} INTERFACE)
 
+  # Install dummy target with the cmake files
   target_install_package(
     ${PROJECT_NAME}
     ADDITIONAL_FILES
