@@ -12,11 +12,30 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(ClangTidyCmake)
+# or 
+# cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.2.0")
 ```
 
-### Using cpmaddpackage (FetchContent wrapper)
+Usually you should wrap this to avoid exposing tidy to a consumer of this CMake project, e.g
 ```cmake
-cpmaddpackage("gh:jkammerland/clang-tidy.cmake@1.2.0")
+# add_library(${PROJECT_NAME} ...)
+
+option(${PROJECT_NAME}_ENABLE_CLANG_TIDY_CMAKE "Enable clang-tidy.cmake" OFF)
+if(${PROJECT_NAME}_ENABLE_CLANG_TIDY_CMAKE)
+  include(FetchContent)
+  FetchContent_Declare(
+    ClangTidyCmake
+    GIT_REPOSITORY https://github.com/jkammerland/clang-tidy.cmake.git
+    GIT_TAG 1.2.0
+    # Optional arg to first try find_package locally before fetching, see manual installation
+    # NOTE: This must be called last, with 0 to N args following FIND_PACKAGE_ARGS
+    # FIND_PACKAGE_ARGS
+  )
+  FetchContent_MakeAvailable(ClangTidyCmake)
+  
+  # add tidy target checking your target's sources
+  target_tidy_sources(${PROJECT_NAME})
+endif()
 ```
 
 ### Manual install
